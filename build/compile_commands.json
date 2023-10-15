@@ -1,0 +1,13 @@
+[
+{
+  "directory": "/home/matt/DAT/Controller-Agent/build",
+  "command": "/usr/bin/g++   -I../inc  -g   -std=gnu++2a -o CMakeFiles/Controller-Agent.dir/src/main.cpp.o -c /home/matt/DAT/Controller-Agent/src/main.cpp",
+  "file": "/home/matt/DAT/Controller-Agent/src/main.cpp"
+},
+
+{
+  "directory": "/home/matt/DAT/Controller-Agent/build",
+  "command": "/usr/bin/g++   -I../inc  -g   -std=gnu++2a -o CMakeFiles/Controller-Agent.dir/src/serial_if.cpp.o -c /home/matt/DAT/Controller-Agent/src/serial_if.cpp",
+  "file": "/home/matt/DAT/Controller-Agent/src/serial_if.cpp"
+}
+]

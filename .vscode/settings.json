@@ -1,0 +1,13 @@
+{
+    "cmake.sourceDirectory": "/home/matt/DAT/Controller-Agent",
+    "files.associations": {
+        "optional": "cpp",
+        "variant": "cpp",
+        "*.tcc": "cpp",
+        "*.ipp": "cpp",
+        "ostream": "cpp",
+        "array": "cpp",
+        "string": "cpp",
+        "string_view": "cpp"
+    }
+}
