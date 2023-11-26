@@ -9,12 +9,13 @@ project(Controller-Agent)
 set(SOURCE_FILES src/main.cpp src/serial_if.cpp)
 include_directories(inc)
 
-find_package(Boost REQUIRED COMPONENTS system)
+find_package(Boost REQUIRED COMPONENTS system thread)
+
 # Create an executable target named "hello_world" from the source files
 add_executable(Controller-Agent ${SOURCE_FILES})
 
 find_package(Threads REQUIRED)
-target_link_libraries(Controller-Agent Threads::Threads)
+target_link_libraries(Controller-Agent PRIVATE ${Boost_LIBRARIES})
 target_include_directories(Controller-Agent PRIVATE inc)
 
 # Specify the output dir for the exe

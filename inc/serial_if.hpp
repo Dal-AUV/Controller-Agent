@@ -1,8 +1,8 @@
 /**
  * @file serial_if.hpp
- * @author your name (you@domain.com)
+ * @author Matthew Cockburn 
  * @brief 
- * @version 0.1
+ * @version 1
  * @date 2023-10-14
  * 
  * @copyright Copyright (c) 2023
@@ -11,52 +11,74 @@
 #include <string>
 #include <thread>
 #include <queue>
-#include <semaphore.h>
+#include <mutex>
+#include <condition_variable>
 #include <boost/asio.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
+#include <boost/thread/condition_variable.hpp>
 
 #define SERIAL_IF_BUFFER_MAX 2000
 #define SERIAL_IF_QUEUE_SIZE 500
 
+class CountingSemaphore{
+    private:
+    uint8_t myCount;
+    std::mutex myMutex;
+    std::condition_variable myCondition;
+
+    public:
+    /**
+     * @brief Construct a new Counting Semaphore object
+     * 
+     * @param count 
+     */
+    CountingSemaphore(uint8_t count);
+    /**
+     * @brief 
+     * 
+     */
+    void acquire(void);
+    /**
+     * @brief 
+     * 
+     */
+    void release(void);
+    /**
+     * @brief 
+     * 
+     * @return uint8_t 
+     */
+    uint8_t count(void);
+};
+
 class serial_if
 {
 private:
-    std::string port;
-    std::thread readerThread;
-    std::thread writerThread;
-    sem_t startSem;
-    boost::asio::io_service io;
-    boost::asio::serial_port serial;
+    boost::asio::io_context& m_ctx;
+    boost::lockfree::spsc_queue<std::vector<uint8_t>>& m_queue;
+    //boost::condition_variable &m_cond;
+    boost::asio::serial_port m_port;
+    boost::asio::streambuf m_serialData;
+    CountingSemaphore readCount;
 
-    //boost::lockfree::spsc_queue<uint8_t> writerQueue;
-    void reader(void);
-
+    void processData(const boost::system::error_code &ec, const uint8_t *buf, std::size_t size);
+    void read(void);
 public:
-    boost::lockfree::spsc_queue<uint8_t> readerQueue;
     /**
-     * @brief Construct a new serial_if::serial_if object
-     * @param port_name - std::string name of the serial port 
+     * @brief Construct a new serial if object
+     * @param ctx the boost::asio:io_context
      */
-    serial_if(std::string port_name);
+    serial_if(boost::asio::io_context &ctx,boost::lockfree::spsc_queue<std::vector<uint8_t>>& queue);
     /**
-     * @brief Destroy the serial_if object
+     * @brief Configure and start the serial port
+     * @param device 
      */
-    ~serial_if();
+    void start(const std::string &device);
     /**
-    * @brief Start the serial interface backend services
-    * @warning This will spawn an additional threads
-    */
-    void run(void);
-    /**
-    * @brief End the serial interface backend services
-    */
-    void end(void);
-    /**
-     * @brief Write a buffer to the serial interface
-     * @param buffer - ptr of uint8_t buffer
-     * @param size - size of the buffer
-     * @return true - success
-     * @return false - failure
+     * @brief function call to write to the serial interface
+     * @warning this function does not and are return character
+     * @param buffer of data to be written
      */
-    bool write(uint8_t * buffer, size_t size);
+    void write(const std::string &buffer);
+
 };

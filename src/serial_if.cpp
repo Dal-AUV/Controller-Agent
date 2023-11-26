@@ -12,96 +12,91 @@
  * 
  */
 #include <iostream>
-
+#include <iomanip>
 #include "defs.h"
 #include "serial_if.hpp"
 
-/* Local Prototypes*/
-void readCallback(serial_if * serial);
-static void writer(serial_if * serial);
+
+CountingSemaphore::CountingSemaphore(uint8_t count){
+    myCount = count;
+}
+
+void CountingSemaphore::acquire(void){
+    
+    std::unique_lock<std::mutex> lock(myMutex);
+    
+    while(myCount == 0){
+        myCondition.wait(lock);
+    }
+    
+    myCount--;
+    
+    return;
+}
+
+void CountingSemaphore::release(void){
+    
+    std::unique_lock<std::mutex> lock(myMutex);
+    myCount++;
+    myCondition.notify_one();
+
+    return;
+}
+
+uint8_t CountingSemaphore::count(void){
+    return myCount;
+}
 
 /* Serial Interface Public Methods */
-serial_if::serial_if(std::string port_name):
-    port(port_name),io(),serial(io, port_name),
-    readerQueue(SERIAL_IF_QUEUE_SIZE)//, writerQueue(50)
+serial_if::serial_if(boost::asio::io_context &ctx, boost::lockfree::spsc_queue<std::vector<uint8_t>> &queue):
+    m_ctx(ctx),
+    m_port(ctx),
+    m_queue(queue),
+    readCount(0)
 {
-    using namespace std;
-    using namespace boost::asio;
-    // Acquire the start semaphore 
-    sem_init(&startSem,0,0);   
-    // Start the threads for reading and writing to the serial port
-    readerThread = thread([this] { reader(); });
-   // writerThread = thread(writer,this);
-}
-
-serial_if::~serial_if(void){
     return;
 }
 
-void serial_if::run(void){
-    sem_post(&startSem);
+void serial_if::start(const std::string &device)
+{
+    m_port.open(device);
+    m_port.set_option(boost::asio::serial_port::baud_rate(115200));
+    m_port.set_option(boost::asio::serial_port::character_size(8));
+    m_port.set_option(boost::asio::serial_port::parity(boost::asio::serial_port_base::parity::none));
+    m_port.set_option(boost::asio::serial_port_base::stop_bits(boost::asio::serial_port_base::stop_bits::one));
+    read();
     return;
 }
 
-void serial_if::end(void){
+void serial_if::read()
+{
+    boost::asio::async_read(
+        m_port,
+        m_serialData,
+        boost::asio::transfer_at_least(1),
+        [this](const boost::system::error_code &ec,std::size_t size) 
+        { processData(ec, boost::asio::buffer_cast<const uint8_t*>(m_serialData.data()), size); }
+    );
+}
+
+void serial_if::processData(const boost::system::error_code &ec, const uint8_t *buf, std::size_t size)
+{
+    // TODO [M.C]: Determine how to properly error handle
+    if (ec) return;
     
-    readerThread.join();
+    // Print or handle the received data
+    std::vector<uint8_t> data(buf, buf +  size);
+    std::cout << "Data: " << data.data() << " Size: " << size << std::endl;
 
-    return;
-}
-
-bool serial_if::write(uint8_t * buf, size_t size){    
-    assert(buf);
-
-    if(size == 0){
-        return false;
+    for (const auto& value : data) {
+        std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(value) << " ";
     }
 
-    if(boost::asio::write(serial, boost::asio::buffer(buf, size)) != size){
-        return false;
-    }else{
-        return true;
-    }
-}
-/* Serial Interface Private Methods*/
-/**
- * @brief This is the reader thread for the serial interface
- * @note This thread will wait until the run method of this 
- * class is called before reading data from the serial port
- * @note Data will be sent using the readQueue in a uint8_t 
- * format
- * @warning Only the SIGINT signal will gracefully end this thread 
- */
-void serial_if::reader(void){
-    using namespace std;
-    using namespace boost::asio;
+    std::cout << std::endl;
 
-    constexpr size_t max_buffer_size = 256;
-    uint8_t data[max_buffer_size];
-    std::cout << "Starting Reader Thread" << std::endl;
-    try{
-        /* Wait until the serial interface is started */
-        sem_wait(&startSem);
-        /* Loop until we catch a werewolf */
-        while(!SliverBullet){
-            async_read(serial, buffer(data, max_buffer_size),
-                [&](const boost::system::error_code& ec, size_t bytes){
-                    if(!ec){
-                        std::vector<uint8_t> receivedData(data, data+ bytes);
-                        for( size_t i = 0; i <bytes; ++i){
-                            readerQueue.push(data[i]);
-                            cout << "Read byte: " << data[i] << endl;
-                        }
-                    }else{
-                        std::cerr << "Error in async_read: " << ec.message() << std::endl;
-                    }
-                }
-            );
-            io.run();
-        }
-    } catch (std::exception& e) {
-        std::cerr << "Exception in reader thread: " << e.what() << endl;
-    }
-    return;
+
+    m_serialData.consume(m_serialData.size());
+
+    read();
+
 }
-/* Local Methods */
